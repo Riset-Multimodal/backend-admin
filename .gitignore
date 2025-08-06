@@ -1,0 +1,7 @@
+.venv
+.env
+
+rosa_function_output
+posture_avg.jsonl
+
+.idea
