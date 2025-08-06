@@ -1,7 +1,7 @@
 .venv
 .env
 
-rosa_function_output
-posture_avg.jsonl
+utils/out_of_topic_helper/rosa_function_output
+utils/out_of_topic_helper/posture_avg.jsonl
 
 .idea
