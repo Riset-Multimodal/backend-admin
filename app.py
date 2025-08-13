@@ -104,7 +104,9 @@ def get_users():
     try:
         query = session.query(User).all()
 
-        return jsonify(query)
+        users = [user.as_dict() for user in query]
+
+        return jsonify(users)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
