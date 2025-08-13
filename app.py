@@ -1,11 +1,13 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import math  # JANGAN LUPA IMPORT INI
+import math
 from models import Base, Keylog, Posture, User
+import psutil
+import socket
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 CORS(app)
 
 # Konfigurasi koneksi ke PostgreSQL
@@ -50,11 +52,6 @@ def paginate_query(query, request):
 
 
 # -----------------------------------------------
-
-@app.route('/')
-def index():
-    return "Riset API is Running!"
-
 
 @app.route('/keylog', methods=['GET'])
 def get_keylogs():
@@ -112,6 +109,27 @@ def get_users():
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()
+
+@app.route('/api/system')
+def system_api():
+    ip = socket.gethostbyname(socket.gethostname())
+    cpu = psutil.cpu_percent(interval=0.5)
+    memory = psutil.virtual_memory().percent
+    net_io = psutil.net_io_counters()
+    net_sent = round(net_io.bytes_sent / (1024 * 1024), 2)
+    net_recv = round(net_io.bytes_recv / (1024 * 1024), 2)
+
+    return jsonify({
+        'ip': ip,
+        'cpu': cpu,
+        'memory': memory,
+        'net_sent': net_sent,
+        'net_recv': net_recv
+    })
+
+@app.route('/')
+def index():
+    return send_from_directory(app.static_folder, 'index.html')
 
 
 if __name__ == '__main__':
