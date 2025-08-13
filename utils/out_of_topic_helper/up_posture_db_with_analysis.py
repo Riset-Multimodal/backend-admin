@@ -1,9 +1,9 @@
 import os
 import glob
+import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from models import Posture
-from PostureAnalyze.func_main import analyze_ergonomics_from_files
 from supabase import create_client, Client
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -33,36 +33,14 @@ def upload_to_supabase(file_path, remote_name):
         {"upsert": "true"}
     )
 
-    # get_public_url() langsung return string URL
     url = supabase.storage.from_(SUPABASE_BUCKET).get_public_url(remote_name)
     return url
 
 
-def process_single_capture(user_folder, capture_id, imgs):
-    """Dipanggil oleh worker untuk memproses 1 capture_id"""
+def process_single_capture(user_folder, capture_id, imgs, analysis_results):
     session = Session()
     try:
-        print(f"🔍 Analisis posture: {user_folder}, capture_id={capture_id}")
-
-        # Baca bytes untuk analisis
-        with open(imgs["front_image"], "rb") as f:
-            front_bytes = f.read()
-        with open(imgs["side_image"], "rb") as f:
-            side_bytes = f.read()
-        with open(imgs["overhead_image"], "rb") as f:
-            overhead_bytes = f.read()
-
-        # Analisis ergonomi
-        results = analyze_ergonomics_from_files(
-            file_front=front_bytes,
-            file_side=side_bytes,
-            file_overhead=overhead_bytes,
-            save_log=True
-        )
-
-        if not results:
-            print(f"⚠️ Analisis gagal untuk {capture_id}")
-            return False
+        print(f"📦 Simpan data posture: {user_folder}, capture_id={capture_id}")
 
         # Upload ke Supabase
         front_link = upload_to_supabase(imgs["front_image"], f"{user_folder}/{os.path.basename(imgs['front_image'])}")
@@ -75,7 +53,7 @@ def process_single_capture(user_folder, capture_id, imgs):
             front_image_link=front_link,
             side_image_link=side_link,
             overhead_image_link=overhead_link,
-            **results
+            **analysis_results
         )
 
         session.add(posture_entry)
@@ -99,8 +77,21 @@ def process_posture_images():
             if not os.path.isdir(folder_path):
                 continue
 
+            analysis_path = os.path.join(folder_path, "analysis_history.json")
+            if not os.path.exists(analysis_path):
+                print(f"⏭️ Lewati {user_folder}, tidak ada analysis_history.json")
+                continue
+
+            with open(analysis_path, "r") as f:
+                try:
+                    analysis_data = json.load(f)
+                except json.JSONDecodeError:
+                    print(f"⚠️ Gagal parsing JSON untuk {user_folder}")
+                    continue
+
             images = glob.glob(os.path.join(folder_path, "*.jpg"))
             if not images:
+                print(f"⏭️ Lewati {user_folder}, tidak ada gambar .jpg")
                 continue
 
             # Group berdasarkan capture_id
@@ -110,7 +101,7 @@ def process_posture_images():
                 parts = filename.split("_")
                 if len(parts) < 3:
                     continue
-                capture_id = parts[1]
+                capture_id = f"{parts[0]}_{parts[1]}"
                 if capture_id not in capture_map:
                     capture_map[capture_id] = {}
                 if "front" in filename:
@@ -121,8 +112,11 @@ def process_posture_images():
                     capture_map[capture_id]["overhead_image"] = img_path
 
             for capture_id, imgs in capture_map.items():
-                if all(k in imgs for k in ["front_image", "side_image", "overhead_image"]):
-                    tasks.append(executor.submit(process_single_capture, user_folder, capture_id, imgs))
+                if capture_id in analysis_data and all(k in imgs for k in ["front_image", "side_image", "overhead_image"]):
+                    analysis_results = analysis_data[capture_id]["analysis_results"]
+                    tasks.append(executor.submit(process_single_capture, user_folder, capture_id, imgs, analysis_results))
+                else:
+                    print(f"⚠️ Data tidak lengkap atau tidak ada analisis untuk {user_folder} - {capture_id}")
 
         # Tunggu semua selesai
         for future in as_completed(tasks):

@@ -66,7 +66,6 @@ def get_keylogs():
         if email_filter:
             query = query.filter(Keylog.user_email == email_filter)
 
-        # Cukup panggil fungsi paginate_query
         paginated_data = paginate_query(query, request)
         return jsonify(paginated_data)
 
@@ -88,12 +87,9 @@ def get_postures():
         if email_filter:
             query = query.filter(Posture.user_email == email_filter)
 
-        # Urutkan berdasarkan timestamp ascending
         query = query.order_by(asc(Posture.timestamp))
 
-        # Pagination
         paginated_data = paginate_query(query, request)
-        print(paginated_data)
         return jsonify(paginated_data)
 
     except Exception as e:
@@ -108,9 +104,7 @@ def get_users():
     try:
         query = session.query(User)
 
-        # Panggil fungsi yang sama
-        paginated_data = paginate_query(query, request)
-        return jsonify(paginated_data)
+        return jsonify(query)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
