@@ -102,7 +102,7 @@ def get_postures():
 def get_users():
     session = Session()
     try:
-        query = session.query(User)
+        query = session.query(User).all()
 
         return jsonify(query)
 
