@@ -137,6 +137,7 @@ class User(Base):
     __tablename__ = 'users'
 
     user_email = Column(String, primary_key=True)
+    name = Column(String)
     created_at = Column(DateTime)
 
     def as_dict(self):

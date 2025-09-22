@@ -10,7 +10,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 # -----------------------
 # KONFIGURASI
 # -----------------------
-DB_URL = "postgresql://postgres:123@proxy.bccdev.id:11015/riset_db"
+DB_URL = "postgresql://postgres:123@10.34.239.190:5433/riset-prod"
 BASE_POSTURE_FOLDER = r"D:\Riset\python-scripts\uploads\posture"
 
 SUPABASE_URL = "https://cnqvveimdkpztkjndvyp.supabase.co"

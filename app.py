@@ -27,7 +27,7 @@ app.add_middleware(
 )
 
 # --- DB setup ---
-DB_URL = "postgresql://postgres:123@proxy.bccdev.id:11015/riset_db"
+DB_URL = "postgresql://postgres:123@10.34.239.190:5433/riset-prod"
 engine = create_engine(DB_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
