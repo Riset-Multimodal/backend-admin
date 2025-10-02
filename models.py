@@ -143,6 +143,7 @@ class User(Base):
     __tablename__ = 'users'
 
     user_email = Column(String, primary_key=True)
+    faculty = Column(String)
     name = Column(String)
     created_at = Column(DateTime)
 
