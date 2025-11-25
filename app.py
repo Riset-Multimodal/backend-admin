@@ -118,14 +118,34 @@ class NordicOut(BaseModel):
     summary="List Nordic Body Map responses (optionally filter by email)"
 )
 def list_nordic(
-    email: Optional[EmailStr] = Query(None, description="Jika diisi, filter berdasarkan user email"),
+    email: Optional[EmailStr] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
 
+    from sqlalchemy import func, and_
+
+    # Subquery: ambil setiap email dengan created_at terbaru
+    subq = (
+        db.query(
+            NordicBodymapResponse.user_email,
+            func.max(NordicBodymapResponse.created_at).label("latest")
+        )
+        .group_by(NordicBodymapResponse.user_email)
+        .subquery()
+    )
+
+    # Join ke tabel utama untuk ambil row lengkap
     q = (
         db.query(NordicBodymapResponse, User.name.label("name"))
+        .join(
+            subq,
+            and_(
+                NordicBodymapResponse.user_email == subq.c.user_email,
+                NordicBodymapResponse.created_at == subq.c.latest,
+            )
+        )
         .join(User, NordicBodymapResponse.user_email == User.user_email)
         .order_by(NordicBodymapResponse.created_at.desc())
     )
@@ -137,7 +157,10 @@ def list_nordic(
 
     return [
         NordicOut(
-            **{**row.NordicBodymapResponse.__dict__, "name": row.name}
+            **{
+                **row.NordicBodymapResponse.__dict__,
+                "name": row.name,
+            }
         )
         for row in rows
     ]
