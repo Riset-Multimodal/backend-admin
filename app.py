@@ -1,4 +1,5 @@
 # app.py (modifikasi + endpoint gambar)
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
@@ -11,12 +12,13 @@ from fastapi import FastAPI, Depends, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import EmailStr, BaseModel, computed_field
 
 from sqlalchemy import create_engine, asc
 from sqlalchemy.orm import sessionmaker, Session
 
 # import models (tambahkan TlxResponse)
-from models import Base, Keylog, Posture, User, TlxResponse
+from models import Base, Keylog, Posture, User, TlxResponse, NordicBodymapResponse
 
 import matplotlib
 matplotlib.use("Agg")  # headless backend
@@ -89,6 +91,57 @@ def get_keylogs(
         return paginate_query(query, page, per_page)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class NordicOut(BaseModel):
+    id: int
+    user_email: EmailStr
+    created_at: datetime
+    name: str
+
+    nbm_0:  int; nbm_1:  int; nbm_2:  int; nbm_3:  int; nbm_4:  int; nbm_5:  int; nbm_6:  int
+    nbm_7:  int; nbm_8:  int; nbm_9:  int; nbm_10: int; nbm_11: int; nbm_12: int; nbm_13: int
+    nbm_14: int; nbm_15: int; nbm_16: int; nbm_17: int; nbm_18: int; nbm_19: int; nbm_20: int
+    nbm_21: int; nbm_22: int; nbm_23: int; nbm_24: int; nbm_25: int; nbm_26: int
+
+    # property helper dari model
+    @computed_field
+    def total_score(self) -> int:
+        return sum(
+            getattr(self, f"nbm_{i}", 0) for i in range(1, 28)
+        )
+
+    model_config = dict(from_attributes=True)
+
+@app.get(
+    "/nordic",
+    response_model=List[NordicOut],
+    summary="List Nordic Body Map responses (optionally filter by email)"
+)
+def list_nordic(
+    email: Optional[EmailStr] = Query(None, description="Jika diisi, filter berdasarkan user email"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+
+    q = (
+        db.query(NordicBodymapResponse, User.name.label("name"))
+        .join(User, NordicBodymapResponse.user_email == User.user_email)
+        .order_by(NordicBodymapResponse.created_at.desc())
+    )
+
+    if email:
+        q = q.filter(NordicBodymapResponse.user_email == str(email))
+
+    rows = q.offset(offset).limit(limit).all()
+
+    return [
+        NordicOut(
+            **{**row.NordicBodymapResponse.__dict__, "name": row.name}
+        )
+        for row in rows
+    ]
+
 
 @app.get("/posture")
 def get_postures(
